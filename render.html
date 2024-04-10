@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Circle Movement</title>
+<style>
+    body, html {
+        margin: 0;
+        padding: 0;
+        width: 100%;
+        height: 100%;
+    }
+    
+    canvas {
+        display: block;
+        width: 100%;
+        height: calc(100% - 20px); /* Adjusted height to accommodate fuel bar */
+        border: 1px solid black;
+    }
+
+    #fuel-bar {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        width: 100%;
+        height: 20px;
+        background-color: #ccc;
+    }
+
+    #fuel-level {
+        height: 100%;
+        background-color: yellow;
+    }
+</style>
+</head>
+<body>
+<canvas id="canvas"></canvas>
+<div id="fuel-bar">
+    <div id="fuel-level"></div>
+</div>
+<script>
+    // Get the canvas and its 2d context
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+
+    // Set initial position and size of the circle
+    let x = canvas.width / 2;
+    let y = canvas.height / 2;
+    const radius = 20;
+
+    // Set movement speed and velocity
+    const speed = 3; // Reduced speed
+    let velocityX = 0;
+    let velocityY = 0;
+
+    // Gravity force
+    const gravity = 0.2;
+
+    // Fuel settings
+    const maxFuel = 100; // Maximum fuel capacity
+    let fuel = maxFuel; // Initial fuel level
+    const fuelGain = 50; // Fuel gained when touching the floor
+
+    // Store the keys that are currently being pressed
+    const keysPressed = {};
+
+    // Username to display on top of the circle
+    const username = "Lupta";
+
+    // Particle settings
+    const particles = [];
+
+    // Function to create a particle
+    function createParticle() {
+        if (keysPressed['w']) {
+            particles.push({
+                x: x,
+                y: y,
+                velocityX: Math.random() * 2 - 1, // Random horizontal velocity
+                velocityY: Math.random() * 2 - 1, // Random vertical velocity
+                color: getRandomColor(), // Random rainbow color
+                size: Math.random() * 4 + 2, // Random size between 2 and 6
+                lifetime: 4 * 60 // Lifetime of 4 seconds (60 frames per second)
+            });
+            fuel--; // Reduce fuel when flying up
+        }
+    }
+
+    // Function to generate a random rainbow color
+    function getRandomColor() {
+        const hue = Math.floor(Math.random() * 360);
+        return `hsl(${hue}, 100%, 50%)`; // Random hue, full saturation, 50% lightness
+    }
+
+    // Function to draw a particle
+    function drawParticle(particle) {
+        ctx.beginPath();
+        ctx.arc(particle.x, particle.y, particle.size, 0, Math.PI * 2);
+        ctx.fillStyle = particle.color;
+        ctx.fill();
+        ctx.closePath();
+    }
+
+    // Function to draw the circle with username and particles
+    function drawCircle() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        
+        // Draw actual circle
+        ctx.beginPath();
+        ctx.arc(x, y, radius, 0, Math.PI * 2);
+        ctx.fillStyle = 'blue'; // Change color to blue
+        ctx.fill();
+        ctx.closePath();
+        
+        // Draw username
+        ctx.font = '16px Consolas'; // Set font size and family
+        ctx.fillStyle = 'black'; // Set text color to black
+        ctx.textAlign = 'center'; // Center the text horizontally
+        ctx.fillText(username, x, y - radius - 10); // Draw text above the circle
+        
+        // Draw particles
+        particles.forEach(drawParticle);
+    }
+
+    // Function to update circle position based on keys being pressed
+    function updatePosition() {
+        // Apply gravity
+        velocityY += gravity;
+
+        // Handle horizontal movement
+        if (keysPressed['a']) {
+            velocityX = -speed; // Move left
+        } else if (keysPressed['d']) {
+            velocityX = speed; // Move right
+        } else {
+            velocityX = 0; // Stop horizontal movement if neither 'a' nor 'd' is pressed
+        }
+
+        // Fly up if 'w' key is pressed and there's fuel
+        if (keysPressed['w'] && fuel > 0) {
+            velocityY = -speed * 2; // Increase negative velocity to fly up faster
+        }
+
+        // Update position based on velocity
+        x += velocityX;
+        y += velocityY;
+
+        // Create particles when the ball moves
+        createParticle();
+
+        // Ensure circle stays within the canvas boundaries
+        if (x < radius) {
+            x = radius;
+        }
+        if (x > canvas.width - radius) {
+            x = canvas.width - radius;
+        }
+        if (y < radius) {
+            y = radius;
+            velocityY = 0; // Stop vertical velocity when hitting top boundary
+        }
+        if (y > canvas.height - radius) { // Check if bottom edge of circle is below canvas height
+            y = canvas.height - radius; // Set circle just above the floor
+            velocityY = 0; // Stop vertical velocity
+            fuel = maxFuel; // Refill fuel when touching the floor
+        }
+
+        // Update particles' positions and lifetimes
+        particles.forEach(particle => {
+            particle.x += particle.velocityX;
+            particle.y += particle.velocityY;
+            particle.lifetime--;
+        });
+
+        // Remove particles that are out of bounds or expired
+        particles.forEach((particle, index) => {
+            if (particle.y > canvas.height || particle.x < 0 || particle.x > canvas.width || particle.lifetime <= 0) {
+                particles.splice(index, 1);
+            }
+        });
+
+        // Redraw the circle with username and particles at the new position
+        drawCircle();
+        updateFuelBar();
+    }
+
+    // Function to update fuel bar
+    function updateFuelBar() {
+        const fuelLevel = document.getElementById('fuel-level');
+        fuelLevel.style.width = (fuel / maxFuel) * 100 + '%';
+    }
+
+    // Function to handle key down events
+    function handleKeyDown(e) {
+        keysPressed[e.key] = true;
+    }
+
+    // Function to handle key up events
+    function handleKeyUp(e) {
+        keysPressed[e.key] = false;
+    }
+
+    // Add event listeners for key down and key up events
+    document.addEventListener('keydown', handleKeyDown);
+    document.addEventListener('keyup', handleKeyUp);
+
+    // Function to update circle position and redraw it
+    function update() {
+        updatePosition();
+        requestAnimationFrame(update);
+    }
+
+    // Set canvas dimensions based on window size
+    function setCanvasSize() {
+        canvas.width =
+ window.innerWidth;
+        canvas.height = window.innerHeight - 20; // Adjusted height to accommodate fuel bar
+        drawCircle(); // Redraw circle when canvas size changes
+    }
+
+    // Initial setup
+    setCanvasSize();
+    window.addEventListener('resize', setCanvasSize);
+
+    // Initial draw
+    drawCircle();
+    updateFuelBar(); // Initialize fuel bar
+
+    // Start the update loop
+    update();
+</script>
+</body>
+</html>
